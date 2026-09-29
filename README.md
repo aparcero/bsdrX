@@ -872,6 +872,54 @@ voice to the cloud instead. bsdrX does the codec/DSP; the relay just shuttles an
 
 ## Build & run
 
+### Local development with mise + just
+
+Use [mise](https://mise.jdx.dev/) for the pinned development tools and
+[just](https://just.systems/) as the task runner. `mise.toml` pins just and CMake;
+the existing `configure` and Makefile still check libraries and compile the code.
+The native workflow below is for Linux and macOS. It uses the host C compiler,
+GNU Make, `pkg-config`, curl, tar, and the platform's media development libraries
+(see the platform sections below).
+
+```bash
+mise trust
+mise install
+mise exec -- just build
+mise exec -- just test
+mise exec -- just run
+```
+
+If mise is activated in your shell, use `just build`, `just test`, and `just run`
+directly. Run `just` to list tasks. Mise stores its tools in its user-managed tool
+directory; these tasks do not install bsdrX or packages into the system.
+
+The first build prepares a SHA-256-verified, pinned **usrsctp 0.9.5.0** static
+library in `build-local/deps`, runs `./configure`, and builds `build/bsdr_agent`
+and the available plugins. There is no need to install usrsctp system-wide.
+ONNX Runtime is fetched into `third_party/onnxruntime` using the existing pinned
+download script. Other native libraries, including FFmpeg and OpenSSL, must
+already be available to the compiler; mise does not provide those here.
+
+`just run` keeps application settings in `build-local/config` and caches/models
+in `build-local/cache`. Tests use separate settings under `build-local/tests`
+(some existing tests also use temporary directories). All these generated paths
+are ignored by Git. No application installation step is needed.
+
+```bash
+just deps                       # prepare/reuse the local SCTP library
+just configure --no-onnx-fetch   # configure explicitly, skipping the ONNX download
+just build                      # reuse config.mk and build incrementally
+just run --no-browser           # forward flags directly to the agent
+BSDR_JOBS=4 just build           # limit concurrent compiler jobs
+just clean                      # remove app build outputs; keep deps and settings
+```
+
+Re-run `just configure` after changing compiler flags or native libraries, or
+after `make distclean`. Configure accepts the same options as `./configure`.
+It defaults the installation prefix to `build-local/app`, although the local
+tasks run directly from `build/`. Cross-platform release bundles still use the
+existing scripts documented below.
+
 Media (video + audio) is **on by default**. `./configure` is the **required readiness gate**:
 it detects the host OS + every needed library and runs a compile/link smoke test, failing loudly
 if anything is missing (no silent feature-dropping).

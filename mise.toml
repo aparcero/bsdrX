@@ -1,0 +1,5 @@
+# Tool versions only; developer tasks live in justfile.
+# Keep CMake on 3.x for the pinned usrsctp dependency's older CMake policies.
+[tools]
+just = "1.58.0"
+cmake = "3.31.12"

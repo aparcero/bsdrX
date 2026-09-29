@@ -3,6 +3,9 @@
 *.o
 *.a
 /config.mk
+# Personal mise overrides (shared tool pins live in mise.toml).
+/mise.local.toml
+/mise.*.local.toml
 # runtime log (agent --debug output; not a source artifact)
 /debug.log
 /quest_sim_*.h264
