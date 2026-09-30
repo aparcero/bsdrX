@@ -13,10 +13,17 @@ capture**, and an LLM-driven **voice computer-control** assistant.
 It is **multiplatform with feature parity as a design goal** across **Linux,
 Windows, macOS and Android** — the same portable C core runs on all four, and only
 the thin platform shims (capture, audio, input injection) differ. Every feature is
-driven from a **local web control panel** at `http://127.0.0.1:8088` (on Android, the
-very same UI is shown in an embedded WebView).
+driven from the same **control panel**: in the new **Wails desktop app**, in the
+standalone agent's browser UI at `http://127.0.0.1:8088`, or in Android's WebView.
 
-On the desktop the panel opens by default in a **chromeless native app window** (a
+**Native desktop app.** Run `just run` to open the existing controls in a Wails v3
+window using the operating system's WebView. It starts the C streaming agent,
+remembers window geometry, and stops its child agent when closed. Settings and
+caches stay in the checkout. No Chrome/Chromium window is needed. This integration
+uses `wails-starter` as its reference and is currently verified on Linux; see
+[Desktop development](docs/desktop.md) for details and platform limits.
+
+**Standalone agent.** `just agent-run` retains the original **chromeless app window** (a
 Chrome/Edge/Chromium `--app` window that looks like an ordinary application, with an
 instant loading splash) rather than a browser tab — on **Windows, Linux and macOS**
 alike. Pass **`--browser`** to open it in your default browser instead, **`--no-browser`**
@@ -24,7 +31,7 @@ to run the panel without auto-opening anything, or **`--no-ui`** to disable it e
 The Windows build is a GUI app that opens **no console window** unless you pass
 **`--console`** (or launch it from a terminal, where it attaches to the parent console).
 
-**System tray.** In app-window mode a tray icon is installed where the platform has
+**Standalone system tray.** In the agent's app-window mode a tray icon is installed where the platform has
 one — **Windows** always, and **Linux** when a StatusNotifier host is present (loaded at
 runtime via `dlopen`, no build dependency). Closing the window then **minimizes to the
 tray**; right-click for **Open bsdrX** (reopen the window) / **Quit bsdrX**. Where no tray
@@ -875,11 +882,15 @@ voice to the cloud instead. bsdrX does the codec/DSP; the relay just shuttles an
 ### Local development with mise + just
 
 Use [mise](https://mise.jdx.dev/) for the pinned development tools and
-[just](https://just.systems/) as the task runner. `mise.toml` pins just and CMake;
-the existing `configure` and Makefile still check libraries and compile the code.
-The native workflow below is for Linux and macOS. It uses the host C compiler,
+[just](https://just.systems/) as the task runner. `mise.toml` pins just, CMake, Go,
+and Wails v3, matching the desktop starter's Go/Wails versions. The existing
+`configure` and Makefile still compile the C agent; Wails builds the desktop window.
+The desktop workflow is currently verified on Linux. It uses the host C compiler,
 GNU Make, `pkg-config`, curl, tar, and the platform's media development libraries
 (see the platform sections below).
+Linux desktop builds also require **GTK 4 and WebKitGTK 6.0** development
+libraries (`gtk4` and `webkitgtk-6.0` through `pkg-config`). `just doctor` reports
+platform prerequisites; no recipe installs system packages.
 
 ```bash
 mise trust
@@ -895,21 +906,28 @@ directory; these tasks do not install bsdrX or packages into the system.
 
 The first build prepares a SHA-256-verified, pinned **usrsctp 0.9.5.0** static
 library in `build-local/deps`, runs `./configure`, and builds `build/bsdr_agent`
-and the available plugins. There is no need to install usrsctp system-wide.
+and the available plugins, followed by the Wails executable
+`build/bsdrx-desktop`. There is no need to install usrsctp system-wide.
 ONNX Runtime is fetched into `third_party/onnxruntime` using the existing pinned
 download script. Other native libraries, including FFmpeg and OpenSSL, must
 already be available to the compiler; mise does not provide those here.
 
 `just run` keeps application settings in `build-local/config` and caches/models
-in `build-local/cache`. Tests use separate settings under `build-local/tests`
+in `build-local/cache`. Window geometry is saved under `build-local/desktop`,
+and the child agent's output goes to `build-local/logs/agent.log`.
+Tests use separate settings under `build-local/tests`
 (some existing tests also use temporary directories). All these generated paths
 are ignored by Git. No application installation step is needed.
 
 ```bash
 just deps                       # prepare/reuse the local SCTP library
 just configure --no-onnx-fetch   # configure explicitly, skipping the ONNX download
-just build                      # reuse config.mk and build incrementally
-just run --no-browser           # forward flags directly to the agent
+just build                      # build the agent and native desktop app
+just run                        # open the native Wails window
+just run --control-only         # inspect controls without streaming
+just agent-build                # C build only; no Wails prerequisites
+just agent-run --no-browser     # standalone agent and browser-accessible panel
+just doctor                     # report Wails platform requirements
 BSDR_JOBS=4 just build           # limit concurrent compiler jobs
 just clean                      # remove app build outputs; keep deps and settings
 ```
@@ -918,7 +936,10 @@ Re-run `just configure` after changing compiler flags or native libraries, or
 after `make distclean`. Configure accepts the same options as `./configure`.
 It defaults the installation prefix to `build-local/app`, although the local
 tasks run directly from `build/`. Cross-platform release bundles still use the
-existing scripts documented below.
+existing scripts documented below; they package the standalone agent, not the
+new Wails wrapper. The wrapper uses a private loopback control port. It reserves
+the listener/window flags (`--web-port`, `--web-bind`, `--web-allow`, `--no-ui`,
+`--browser`); use `just agent-run` when those options are needed.
 
 Media (video + audio) is **on by default**. `./configure` is the **required readiness gate**:
 it detects the host OS + every needed library and runs a compile/link smoke test, failing loudly

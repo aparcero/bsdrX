@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bsdrX</title>
+  <script type="module" src="/wails/runtime.js"></script>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0c1018; color: #e5eaf2; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    main { max-width: 560px; padding: 40px; }
+    .brand { color: #82b7ff; font-weight: 700; letter-spacing: .08em; }
+    h1 { font-size: 26px; font-weight: 600; margin-top: 28px; }
+    p { line-height: 1.7; color: #9ba8bb; overflow-wrap: anywhere; }
+    code { color: #c1cddd; font-size: 12px; }
+    button { background: #5799ef; color: #071222; border: 0; border-radius: 8px; padding: 12px 20px; font: 600 14px system-ui; cursor: pointer; }
+  </style>
+</head>
+<body><main>
+  <div class="brand">bsdrX</div>
+  {{if .Starting}}
+  <h1>Starting your desktop connection…</h1>
+  <p>Your screen, audio, and headset controls will appear here in a moment.</p>
+  {{else}}
+  <h1>The streaming agent is unavailable</h1>
+  <p>{{.Message}}</p>
+  <form action="/_desktop/retry" method="post"><button type="submit">Try again</button></form>
+  <p>Details are saved in<br><code>{{.LogPath}}</code></p>
+  {{end}}
+</main>
+<script>
+const retry = document.querySelector('form');
+if (retry) retry.addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = retry.querySelector('button');
+  button.disabled = true;
+  button.textContent = 'Starting…';
+  try {
+    await fetch('/_desktop/retry', {method: 'POST'});
+    location.replace('/');
+  } catch (_) {
+    button.disabled = false;
+    button.textContent = 'Try again';
+  }
+});
+setInterval(()=>fetch('/_desktop/status').then(r=>r.json()).then(s=>{if(s.ready||s.starting!=={{.Starting}})location.reload()}).catch(()=>{}),700);
+</script>
+</body>
+</html>

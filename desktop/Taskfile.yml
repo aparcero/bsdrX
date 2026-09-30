@@ -1,0 +1,22 @@
+# Native build layer adapted from the Wails starter. The frontend is served by
+# the C agent, so there is no separate JavaScript build or generated binding API.
+version: '3'
+
+vars:
+  APP_NAME: bsdrx-desktop
+  BIN_DIR: ../build
+
+tasks:
+  build:
+    desc: Build the native Wails window next to bsdr_agent
+    cmds:
+      - go build {{.BUILD_FLAGS}} -o "{{.OUTPUT}}" .
+    vars:
+      OUTPUT: '{{.OUTPUT | default (printf "%s/%s%s" .BIN_DIR .APP_NAME exeExt)}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}-buildvcs=false{{if .EXTRA_TAGS}} -tags {{.EXTRA_TAGS}}{{end}}{{else}}-tags production -trimpath -buildvcs=false -ldflags="-w -s{{if eq OS "windows"}} -H windowsgui{{end}}"{{end}}'
+    env:
+      CGO_ENABLED: '1'
+
+  run:
+    cmds:
+      - '"{{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}}"'
